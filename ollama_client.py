@@ -14,10 +14,9 @@ class OllamaClient:
                 json={
                     "model": self.model_name,
                     "prompt": prompt,
-                    "stream": True
-                },
+                    "stream": True                },
                 stream=True,
-                timeout=10
+                timeout=120
             )
 
             response.raise_for_status()
@@ -25,13 +24,24 @@ class OllamaClient:
             assistant_response = ""
 
             for line in response.iter_lines():
-                if line:
-                    data = json.loads(line)
-                    text = data["response"]
+                if not line:
+                    continue
 
-                    print(text, end="", flush=True)
+                data = json.loads(line)
 
-                    assistant_response += text
+                # We intentionally only collect the final response.
+                # If Ollama provides a separate thinking field,
+                # we ignore it.
+                content = data.get("response")
+
+                if content:
+                    assistant_response += content
+
+            assistant_response = assistant_response.strip()
+
+            if not assistant_response:
+                print("\n[ERROR] Ollama returned an empty response.")
+                return None
 
             return assistant_response
 
@@ -44,9 +54,9 @@ class OllamaClient:
             return None
 
         except requests.exceptions.RequestException as error:
-            print("\n[ERROR] Request failed: {error}")
+            print(f"\n[ERROR] Request failed: {error}")
             return None
 
         except json.JSONDecodeError:
-            print("\n[ERROR] Received invalid data from Ollama.")
+            print("\n[ERROR] Received invalid JSON data from Ollama.")
             return None
